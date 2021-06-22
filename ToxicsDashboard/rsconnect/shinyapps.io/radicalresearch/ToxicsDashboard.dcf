@@ -1,0 +1,13 @@
+name: ToxicsDashboard
+title: ToxicsDashboard
+username:
+account: radicalresearch
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 4259598
+bundleId: 4732283
+url: https://radicalresearch.shinyapps.io/ToxicsDashboard/
+when: 1624048869.86429
+lastSyncTime: 1624048869.86429
+asMultiple: FALSE
+asStatic: FALSE
