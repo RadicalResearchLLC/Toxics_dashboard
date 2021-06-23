@@ -64,11 +64,11 @@ ui <- fluidPage(title = 'Air Toxics Data Dashboard',
           column(6, align = 'center', dataTableOutput('ContextDT'))
         ),
         fluidRow(column(7, align = 'center', plotOutput("compareRisk", height = '600px')),
-                 column(2, textOutput('siteInfo')))
+                 column(2, dataTableOutput('SiteDT')))
         ),
 
 #### Pollutant risk ranking tab ####
-      tabPanel("Pollutant Risk Ranking",
+      tabPanel("Pollutant National Summary",
         fluidRow(
          column(4, align = 'center', selectInput(inputId = 'Yr3', label = 'Select a year',
            selected = '2019', choices = sort(YrList$yr)))
@@ -232,7 +232,11 @@ server <- function(input, output, session) {
     
     Risk4Context() %>%
       filter(aqs_sitecode == as.character(input$RiskContextMap_marker_click[1])) %>%
-      filter(cancerRisk > 0)
+      filter(cancerRisk > 0) %>%
+      select(parameter, aqs_sitecode, method_code, pctBelowMDL, cancer_URE, cancerRisk) %>%
+      mutate('% below MDL' = round(pctBelowMDL, 1), cancerRisk = round(cancerRisk, 1)) %>%
+      select(-pctBelowMDL) %>%
+      arrange(desc(cancerRisk))
   }) 
   
   Risk4Context2 <- reactive({
@@ -243,7 +247,13 @@ server <- function(input, output, session) {
       distinct() %>%
       left_join(annual_risk) %>%
       filter(yr == input$Yr2) %>%
-      mutate(parameter2 = as.factor(parameter))
+      mutate(parameter2 = as.factor(parameter)) %>%
+      mutate(MDL.Category2 = as.factor(case_when(
+        pctBelowMDL < 50 ~ '<50% below MDL',
+        pctBelowMDL < 75 ~ 'Between 50 and 75% below MDL',
+        pctBelowMDL < 90 ~ 'Between 75 and 90% below MDL',
+        pctBelowMDL <= 100 ~'More than 90% below MDL'
+      )))
   })  
   
   tag.map.title <- tags$style(HTML("
@@ -314,7 +324,7 @@ output$compareRisk <- renderPlot({
   
   boxRisk <- ggplot(data = Risk4Context2(), aes(x = parameter, y = cancerRisk)) +
    geom_boxplot() + 
-   geom_jitter(shape = 1, color = 'gray', alpha = 0.7) +
+   geom_jitter(shape = 1, alpha = 0.6, aes(color = MDL.Category2)) +
    theme_bw() +
     geom_hline(color = 'orange', yintercept = 1, linetype = 'twodash') +
     geom_hline(color = 'red', yintercept = 100, linetype = 'twodash') +
@@ -324,13 +334,32 @@ output$compareRisk <- renderPlot({
       as.character(input$Yr2)),
       y = 'Cancer risk (per million)',
       x = '') +
-    theme(text = element_text(size = 18), axis.text.x = element_text(angle = 50, hjust = 1)) +
+    theme(text = element_text(size = 18), axis.text.x = element_text(angle = 50, hjust = 1),
+          legend.position = 'bottom') +
+    scale_color_manual(name = '% below MDL', values = c('<50% below MDL' = 'dark gray',
+                                                              'Between 50 and 75% below MDL' = 'yellow', 
+                                                              'Between 75 and 90% below MDL' = 'orange', 
+                                                              'More than 90% below MDL' = 'red')) +
     geom_point(data = SelectedSite(), aes(x = parameter, y = cancerRisk), shape = 17,
                size = 4, color = 'blue')
  
  boxRisk
    
   })
+
+output$SiteDT <- renderDataTable(
+  SelectedSite(),
+  #caption  = 'Table 3: Project tasks, hours, and costs',
+  #rownames = FALSE, 
+  options = list(dom = 'tp',
+                 pageLength = 10) #%>%
+  #formatStyle('Task Name',
+  #            target = 'row',
+  #           backgroundColor = styleEqual(rowNames,
+  #                                         c('light gray', 'white', 'light gray', 'white', '#cccccc')),
+  #            fontWeight = styleEqual(rowNames,
+  #                                    c('normal', 'normal', 'normal', 'normal', 'bold'))
+)
 
 #### Pollutant Risk reactive and Figure ####
 
@@ -378,11 +407,11 @@ output$PollutantRisk <- renderPlot({
          x = '') +
     theme(text = element_text(size = 18), axis.text.x = element_text(angle = 50, hjust = 1),
           legend.position = 'bottom') +
-    scale_fill_manual(name = 'Percent below MDL', values = c('<50% below MDL on avg' = 'gray',
+    scale_fill_manual(name = '% below MDL', values = c('<50% below MDL on avg' = 'gray',
       'Between 50 and 75% below MDL on avg' = 'yellow', 
       'Between 75 and 90% below MDL on avg' = 'orange', 
       'More than 90% below MDL on avg' = 'red')) +
-    scale_color_manual(name = 'Percent below MDL', values = c('<50% below MDL on avg' = 'dark gray',
+    scale_color_manual(name = '% below MDL', values = c('<50% below MDL on avg' = 'dark gray',
      'Between 50 and 75% below MDL on avg' = 'yellow', 
      'Between 75 and 90% below MDL on avg' = 'orange', 
      'More than 90% below MDL on avg' = 'red')) +
